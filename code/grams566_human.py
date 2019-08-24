@@ -14,20 +14,15 @@ import torch.nn as nn
 import math
 import time
 
-#os.chdir("C:/Users/Rayin/Google Drive/Tier_2_MOE2014/2_Conference/ISMB/data")
-os.chdir("/Users/rayin/Google Drive/Tier_2_MOE2014/2_Conference/ISMB/data")
-#os.chdir("/home/rayin/python/Conference/data")
+os.chdir("Rayin-saber/Time-series-vaccine-prediction/data")
 
-#data_path = '/home/zhangyu/deep_learning/project/china/'
+#read the file name
 #data_name = ['2000.csv','2001.csv','2002.csv','2003.csv','2004.csv','2005.csv','2006.csv','2007.csv','2008.csv','2009.csv','2010.csv','2011.csv','2012.csv','2013.csv','2014.csv','2015.csv']
 data_name = ['2012.csv','2013.csv','2014.csv','2015.csv', '2016.csv', '2017.csv']
 
-
+#open the ProtVec and mapping embeddings
 with open('protVec_100d_3grams.csv', mode='r') as f:
     reader = csv.DictReader(f,delimiter = '\t')
-    #print(dir(reader))
-#    for row in reader:
-#        print(row['d8'])
     name_100d3 = list(reader.fieldnames)
     name_100d3 = name_100d3[1:101]
     
@@ -45,41 +40,8 @@ data_raw_uncertain = []
 for filename in data_name:
     rawdata = pd.read_csv('csv/host/H3N2/'+filename) #series
     rawdata = rawdata['seq'] # series
-#    idx = random.sample(range(1, len(rawdata)), sample_num) # 100 samples per year
-#    sample = rawdata.iloc[idx] # string
-#    data_raw_uncertain.append(sample)
     data_raw_uncertain.append(rawdata)
-#print (len(data_raw_uncertain))
-#print (len(data_raw_uncertain[0]))
-#print (len(data_raw_uncertain[1]))
-#print (len(data_raw_uncertain[2]))
-#print (len(data_raw_uncertain[3]))
-#print (len(data_raw_uncertain[4]))
 
-#print(sample)  
-#print(data_raw_uncertain)  
-
-#count_565 = 0
-#count_566 = 0
-#count_567 = 0
-#count_other = 0
-#for i in range(rawdata.shape[0]):
-#    if len(rawdata.iloc[i]) == 565:
-#        count_565 += 1
-#    elif len(rawdata.iloc[i]) == 566:
-#        count_566 += 1
-#    elif len(rawdata.iloc[i]) == 567:
-#        count_567 += 1
-#    else:
-#        count_other += 1
-
-#calculet the max length of sequence, but the length of sequences into length of 566
-#l = np.zeros((year_num,sample_num))
-#for i in range(year_num):
-#    for j in range(sample_num):
-#        l[i][j] = len(data_raw_uncertain[i].iloc[j])
-#l_max = int(l.max())
-#print ("max length",l_max)
 
 l_max=566
 Btworandom = 'DN'
@@ -88,6 +50,7 @@ Ztworandom = 'EQ'
 Xallrandom = 'ACDEFGHIKLMNPQRSTVWY'
 
 data_raw = data_raw_uncertain
+
 # pad to same length with -
 for i in range(year_num):
     for j in range(len(data_raw_uncertain[i])):
@@ -102,6 +65,7 @@ for i in range(year_num):
             data_raw[i].iloc[j] += '-'*(l_max-len(data_raw_uncertain[i].iloc[j]))
 #print (data_raw[0].iloc[0])
 
+#prepare training data
 def prepare_traindata(seq,random_num):
     result = []
     for i in range(random_num):
@@ -119,16 +83,8 @@ def prepare_traindata(seq,random_num):
 train_data_seq = prepare_traindata(data_raw,random_num)
 
 aminoacid_num = len(train_data_seq)
-#print (len(train_data_seq))
-#print (len(train_data_seq[0]))
-#print (len(train_data_seq[1]))
-#print (len(train_data_seq[2]))
-#print (len(train_data_seq[3]))
-#print (len(train_data_seq[4]))
 
-#print (train_data_seq[0])
-#print (train_data)
-
+#convert to label
 def intlabel(seq):
     data_integer = np.zeros(((l_max-2)*random_num,year_num))
     for i in range((l_max-2)*random_num):
@@ -157,15 +113,17 @@ for i in range(train_label.size(0)):
 train_data = torch.tensor(train_data0)
 train_data = train_data.type(torch.FloatTensor)
 print ("train data shape",train_data.shape)
-        
+
+#parameter settings        
 bs=256
 input_size = 100
 output_size = 9049
 seq_len = year_num-1
 hidden_size = 400
 layer_num = 1
-EPOCH = 100 # train the training data n times
+EPOCH = 50 # train the training data n times
 
+#build the three-layer rnn model
 class three_layer_recurrent_net(nn.Module):
 
     def __init__(self, hidden_size):
@@ -196,6 +154,7 @@ my_lr = 0.1
 
 start=time.time()
 
+#training process
 for epoch in range(EPOCH):
     
     # divide the learning rate by 3 except after the first epoch
@@ -269,6 +228,7 @@ for epoch in range(EPOCH):
     print('epoch=',epoch, '\t time=', elapsed,'\t lr=', my_lr, '\t exp(loss)=',  math.exp(total_loss))
 
 
+#mapping sequence to array to extract the amino acid
 def seq2array(seq):
     data_integer = np.zeros(l_max-2)
     sample_data = np.zeros((l_max-2,100))
@@ -306,7 +266,7 @@ c = torch.zeros(layer_num, l_max-2, hidden_size)
 scores  = net(minibatch_data , h, c)
 # print (scores)
 
-
+#prediction
 def show_next(scores):
     num_word_display=1
     prob=F.softmax(scores,dim=1)
@@ -395,14 +355,11 @@ def prediction_seq(pred, year, sampnum):
 
 prediction_seq(pre_seq, 2017, random_num)
 
-#print ('predict sequence',pre_seq)
-#print ('compare sequence',HA_H3N2_vaccine_2015['seq'].iloc[5])
-#compare2 = sum(1 if c1 == c2 else 0 for c1, c2 in zip(pre_seq, HA_H3N2_vaccine_2015['seq'].iloc[5]))
-#print ('same alpha',compare2)
 
 
 
 
+##predicting multiple years
 #data_name1 = ['2016.csv','2017.csv']
 #data_raw1 = []
 #for filename in data_name1:
